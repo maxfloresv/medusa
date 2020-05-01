@@ -23,7 +23,7 @@ module.exports.run = async (bot, message, args) => {
     .setTitle("Baneo | " + usuarioBaneado.id)
     .setDescription("Baneo")
     .setThumbnail(bot.user.avatarURL())
-    .setColor(extras.color_general) // 0x + el código del color.
+    .setColor(extras.color_general)
     .addField("Usuario baneado: ", usuarioBaneado, true)
     .addField("Baneado por: ", message.author.tag, true)
     .addField("Baneado en: ", message.channel, true)
