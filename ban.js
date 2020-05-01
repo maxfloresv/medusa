@@ -20,15 +20,15 @@ module.exports.run = async (bot, message, args) => {
   if (!canalSancion) return message.channel.send("No se pudo encontrar un canal.");
 
   let embed = new Discord.MessageEmbed()
-    .setTitle("Baneo | " + usuarioBaneado.id)
+    .setTitle("Baneo | " + usuarioBaneado.name)
     .setDescription("Baneo")
     .setThumbnail(bot.user.avatarURL())
-    .setColor(extras.color_general)
-    .addField("Usuario baneado: ", usuarioBaneado, true)
-    .addField("Baneado por: ", message.author.tag, true)
-    .addField("Baneado en: ", message.channel, true)
-    .addField("Fecha de sanción: ", fechaBaneo[1] + ' ' + fechaBaneo[2] + ', ' + fechaBaneo[3], true)
-    .addField("Motivo: ", motivoBaneo !== undefined ? motivoBaneo : "No se definió.");
+    .setColor(extras.color_general) // 0x + el código del color.
+    .addField("Usuario baneado:", usuarioBaneado, true)
+    .addField("Baneado por:", message.author.tag, true)
+    .addField("Baneado en:", message.channel, true)
+    .addField("Fecha de sanción:", `${fechaBaneo[1]} ${fechaBaneo[2]}, ${fechaBaneo[3]}`, true)
+    .addField("Motivo:", motivoBaneo !== "" ? motivoBaneo : "No se definió.");
 
   message.guild.members.ban(usuarioBaneado.id);
   canalSancion.send(embed);
