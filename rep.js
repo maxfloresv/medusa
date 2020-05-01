@@ -14,11 +14,12 @@ module.exports.run = async (bot, message, args, con) => {
             // Caso 1: El usuario no existe en la bbdd y no especificó a alguien.
             if (!rows[0]) { 
                 con.query(`INSERT INTO userInfo (id) VALUES ('${message.author.id}')`, () => {
-                con.query(`SELECT id, lastRep FROM userInfo WHERE id = '${message.author.id}'`, (err, rows) => {
-                    if (cooldown - (Date.now() - rows[0].lastRep) > 0) {
-                        let msDeconstruction = ms(cooldown - (Date.now() - rows[0].lastRep));
-                        extras.info_error(message, "Espera pa dar reps", `${msDeconstruction.hours}h ${msDeconstruction.minutes}m`)              
-                    } else { extras.success(message, "puedes dar reps", "menciona a alguien"); }
+                    con.query(`SELECT id, lastRep FROM userInfo WHERE id = '${message.author.id}'`, (err, rows) => {
+                        if (cooldown - (Date.now() - rows[0].lastRep) > 0) { // Ídem 3.1
+                            let msDeconstruction = ms(cooldown - (Date.now() - rows[0].lastRep));
+                            extras.info_error(message, "Espera pa dar reps", `${msDeconstruction.hours}h ${msDeconstruction.minutes}m`)  
+
+                        } else { extras.success(message, "puedes dar reps", "menciona a alguien"); }
                 });
             });
             // Caso 2: El usuario existe en la bbdd y no especificó a alguien.
@@ -26,7 +27,8 @@ module.exports.run = async (bot, message, args, con) => {
                 con.query(`SELECT id, lastRep FROM userInfo WHERE id = '${message.author.id}'`, (err, rows) => {
                     if (cooldown - (Date.now() - rows[0].lastRep) > 0) {
                         let msDeconstruction = ms(cooldown - (Date.now() - rows[0].lastRep));
-                        extras.info_error(message, "Espera pa dar reps", `${msDeconstruction.hours}h ${msDeconstruction.minutes}m`)              
+                        extras.info_error(message, "Espera pa dar reps", `${msDeconstruction.hours}h ${msDeconstruction.minutes}m`)    
+
                     } else { extras.success(message, "puedes dar reps", "menciona a alguien"); }
                 });
             }
@@ -38,13 +40,12 @@ module.exports.run = async (bot, message, args, con) => {
                 if (!rows[0]) { 
                     con.query(`INSERT INTO userInfo (id) VALUES ('${message.author.id}')`, () => {
                         con.query(`SELECT lastRep FROM userInfo WHERE id = '${message.author.id}'`, (err, rows) => {
-                            if (cooldown - (Date.now() - rows[0].lastRep) > 0) {
+                            if (cooldown - (Date.now() - rows[0].lastRep) > 0) { // if innecesario? eliminar :s
                                 let msDeconstruction = ms(cooldown - (Date.now() - rows[0].lastRep));
                                 extras.info_error(message, "Espera pa dar reps", `${msDeconstruction.hours}h ${msDeconstruction.minutes}m`)
                         
                             } else {
-                                extras.success(message, "Rep dado", `a ${userRep}`)
-                                    
+                                extras.success(message, "Rep dado", `a ${userRep}`)                                    
                                 con.query(`UPDATE userInfo SET lastRep = '${Date.now()}' WHERE id = '${message.author.id}'`)
                                 con.query(`SELECT id, lastRep FROM userInfo WHERE id = '${message.mentions.users.first().id}'`, (err, rows) => {
                                     // Caso 3.1: El usuario al que mencionó no existe en la bbdd.
