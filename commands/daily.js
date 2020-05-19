@@ -29,7 +29,7 @@ module.exports.run = async (bot, message, args, con) => {
     
                     } else {
                         let random = Math.floor(Math.random() * 2);
-                        if (rows[0].dailyBonus > 0 && rows[0].dailyBonus < 5) {
+                        if (rows[0].dailyBonus > 0 && rows[0].dailyBonus < 4) {
                             if (cooldown * 2 - (Date.now() - rows[0].lastDaily) > 0) {
                                 con.query(`UPDATE userInfo SET credits = ${rows[0].credits + amount}, lastDaily = '${Date.now()}', dailyBonus = 0 WHERE id = '${message.author.id}'`);
                                 return extras.new_success(message, "Daily reclamado", `¡Has recibido :dollar: **${amount} créditos**!`+
@@ -39,7 +39,7 @@ module.exports.run = async (bot, message, args, con) => {
                             return extras.new_success(message, "Daily reclamado", `¡Has recibido :dollar: **${amount} créditos**!`+
                             `\nRacha actual: ${rows[0].dailyBonus}`);
 
-                        } else if (rows[0].dailyBonus === 5) {
+                        } else if (rows[0].dailyBonus + 1 === 5) {
                             con.query(`UPDATE userInfo SET credits = ${rows[0].credits + amount * 2}, lastDaily = '${Date.now()}', dailyBonus = 0 WHERE id = '${message.author.id}'`);
                             return extras.new_success(message, "Daily reclamado", `¡Has recibido :dollar: **${amount} créditos**!`+
                             `\n~~Racha actual:~~ **¡Completaste la racha!** (Bonus x2)`);
@@ -77,7 +77,7 @@ module.exports.run = async (bot, message, args, con) => {
                             
                     } else {
                         let random = Math.floor(Math.random() * 2);
-                        if (rows[0].dailyBonus > 0 && rows[0].dailyBonus < 5) {
+                        if (rows[0].dailyBonus > 0 && rows[0].dailyBonus < 4) {
                             if (cooldown * 2 - (Date.now() - rows[0].lastDaily) > 0) {
                                 con.query(`SELECT * FROM userInfo WHERE id = '${user.id}'`, (err, rows) => {
                                     if (!rows[0]) con.query(`INSERT INTO userInfo (id, credits) VALUES ('${user.id}', ${amount})`);
@@ -95,7 +95,7 @@ module.exports.run = async (bot, message, args, con) => {
                             return extras.new_success(message, "Daily reclamado", `¡Le has dado tu daily (:dollar: **${amount} créditos**) a ${user}!`+
                             `\nRacha actual: ${rows[0].dailyBonus}`);
                         
-                        } else if (rows[0].dailyBonus === 5) {
+                        } else if (rows[0].dailyBonus + 1 === 5) {
                             con.query(`SELECT * FROM userInfo WHERE id = '${user.id}'`, (err, rows) => {
                                 if (!rows[0]) con.query(`INSERT INTO userInfo (id, credits) VALUES ('${user.id}', ${amount * 2})`);
                                 else con.query(`UPDATE userInfo SET credits = ${rows[0].credits + amount * 2} WHERE id = '${user.id}'`);
