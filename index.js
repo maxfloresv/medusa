@@ -1,23 +1,23 @@
 const Discord = require("discord.js");
-const bot = new Discord.Client({disableEveryone: true});
-const config = require("./config.json");
-const Enmap = require("enmap");
+const bot = new Discord.Client({ disableEveryone: true, partials: ['MESSAGE', 'REACTION'] });
+const config = require("./config.json"); // config: Recopila y usa datos del archivo config.json creado.
 const fs = require("fs");
 const path = require("path");
-const mysql = require("mysql");
+const mongodb = require("./databases/database.js");
+const Giveaway = require("./databases/model/giveaway.js");
+const scheduleGiveaways = require("./utils/giveaways.js").scheduleGiveaways;
+require("./modules/guildConfigHandler.js")(bot);
+require("./modules/userDataHandler.js")(bot);
 
 bot.commands = new Discord.Collection();
 
-// Conectándose a la bb. dd.
-var con = mysql.createConnection({ host: "xxxx", user: "xxxx", password: "xxxx", database: "xxxx" });
-con.connect(err => { if (err) throw err; });
+(async () => { await mongodb; })();
 
-// Handlers
 fs.readdir(path.join(__dirname, "modules"), (err, files) => {
   if (err) console.log(err);
   files.forEach(file => {
     const event = require(path.join(__dirname, "modules", file));
-    event.run(bot);
+    event.run(bot, con);
   });
 });
 
@@ -30,20 +30,27 @@ fs.readdir(path.join(__dirname, "commands"), (err, files) => {
   }
   archivojs.forEach((f, i) => {
       let propiedades = require(`./commands/${f}`);
-      console.log(`[i] ${f} loaded sucessfully.`);
+      let { aliases } = propiedades.help;
+      console.log(`[i] ${f} loaded successfully.`);
       bot.commands.set(propiedades.help.nombre, propiedades);
+      
+      if (aliases.length !== 0) aliases.forEach(alias => bot.commands.set(alias, propiedades));
   });
 });
 
-// Eventos activados durante la fase de pruebas.
 bot.on("error", (e) => console.error(e));
 bot.on("warn", (e) => console.warn(e));
 bot.on("debug", (e) => console.info(e));
 
-// Estados del bot.
-bot.on("ready", () => {
-  let estados = ['docs @ bot.mpecd.com', 'ayuda: m!help', `${bot.guilds.cache.size} servidores`, `${bot.users.cache.size} usuarios`]
-  console.log(`-MeD- eSports | Bot oficial | Conectado en ${bot.guilds.cache.size} servidor(es) con ${bot.users.cache.size} usuario(s).`);
+bot.on("ready", async () => {
+  const current = new Date();
+  const giveaways = await Giveaway.find({
+    endsOn: { $gt: current }
+  });
+  await scheduleGiveaways(bot, giveaways);
+
+  let estados = ['bot en fase beta!', 'ayuda: m!help', `${bot.guilds.cache.size} servidores`, `${bot.users.cache.size} usuarios`]
+  console.log(`Medusa | Conectado en ${bot.guilds.cache.size} servidor(es) con ${bot.users.cache.size} usuario(s).`);
   setInterval(function() {
     let estado = estados[Math.floor(Math.random() * estados.length)];
     bot.user.setPresence( {
@@ -56,24 +63,4 @@ bot.on("ready", () => {
   }, 60000)
 });
 
-// Pruebas...
-bot.on("message", async message => {  
-  if (message.mentions.users.equals(bot.user)) { return message.channel.send("test"); }
-  
-  con.query(`SELECT id, prefix FROM guildCfg WHERE id = '${message.guild.id}'`, (err, rows) => {
-    if (!rows[0]) return;
-    else {
-      let prefix = rows[0].prefix;
-      if (!message.content.startsWith(prefix)) return;
-  
-      let arrayMensaje = message.content.split(" ");
-      let comando = arrayMensaje[0];
-      let args = arrayMensaje.slice(1);
-      let archivoComandos = bot.commands.get(comando.slice(prefix.length));
-      if (archivoComandos) {
-        archivoComandos.run(bot, message, args, con);
-      }
-    }
-  })
-});
 bot.login(config.token);
