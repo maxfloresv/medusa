@@ -6,8 +6,8 @@ module.exports.run = async (bot, message, args) => {
     if (!args[0]) return extras.new_error(message, "Ocurrió un error", "Debes especificar un canal.");
     else {
         let channel = message.mentions.channels.first() || message.guild.channels.cache.get(args[0]);
-        if (!channel) return extras.new_error(message, "Ocurrió un error", "Ese canal no existe.");
-        else if (channel.type === "text" || channel.type === "voice") {
+        if (!channel || !(channel.type === "text" || channel.type === "voice")) return extras.new_error(message, "Ocurrió un error", "Ese canal no existe. Revisa que sea un canal de voz o texto.");
+        else {
             try {
                 let embed = new MessageEmbed()
                 .setTitle("¿Estás seguro de que quieres restablecer el canal?")
@@ -49,7 +49,6 @@ module.exports.run = async (bot, message, args) => {
                 .catch(() => { return; })
             } catch { return; }
         }
-        else return extras.new_error(message, "Ocurrió un error", "Ese canal no existe.");
     }
 }
 
