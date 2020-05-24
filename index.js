@@ -1,6 +1,6 @@
 const Discord = require("discord.js");
 const bot = new Discord.Client({ disableEveryone: true, partials: ['MESSAGE', 'REACTION'] });
-const config = require("./config.json");
+const config = require("./config.json"); // config: Recopila y usa datos del archivo config.json creado.
 const fs = require("fs");
 const path = require("path");
 const mongodb = require("./databases/database.js");
@@ -17,7 +17,7 @@ fs.readdir(path.join(__dirname, "modules"), (err, files) => {
   if (err) console.log(err);
   files.forEach(file => {
     const event = require(path.join(__dirname, "modules", file));
-    event.run(bot, con);
+    event.run(bot);
   });
 });
 
