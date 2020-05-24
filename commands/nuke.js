@@ -8,7 +8,6 @@ module.exports.run = async (bot, message, args) => {
         let channel = message.mentions.channels.first() || message.guild.channels.cache.get(args[0]);
         if (!channel) return extras.new_error(message, "Ocurrió un error", "Ese canal no existe.");
         else if (channel.type === "text" || channel.type === "voice") {
-            message.delete();
             try {
                 let embed = new MessageEmbed()
                 .setTitle("¿Estás seguro de que quieres restablecer el canal?")
@@ -21,7 +20,7 @@ module.exports.run = async (bot, message, args) => {
                 message.channel.send(embed).then(async m => { await m.react(extras.green_tick_id); await m.react(extras.red_x_id);
                     m.awaitReactions(filter, { max: 1, time: 60000 })
                     .then(async collected => {
-                        await m.delete();
+                        m.delete();
                         let reaction = collected.first();
 
                         if (reaction.emoji.id === extras.green_tick_id) {
@@ -40,10 +39,10 @@ module.exports.run = async (bot, message, args) => {
                                 await m.edit(embed).catch(() => { return; });
                             }).catch(() => { return; });
                         } 
-                        else try { await m.delete(); } catch { return; }  
+                        else try { m.delete(); } catch { return; }  
                     })
                     .catch(async () => {
-                        await m.delete();
+                        m.delete();
                         return extras.new_error(message, "Ocurrió un error", "No reaccionaste al mensaje a tiempo. El menú se ha cerrado.") 
                     })
                 })
