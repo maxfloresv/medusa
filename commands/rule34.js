@@ -2,7 +2,6 @@ const request = require("request");
 const extras = require("../utils/extras");
 
 module.exports.run = async (bot, message, args, settings) => {
-    console.log(generateNumbers(["1", "2", "3"], 5));
     if (!message.channel.nsfw) return extras.new_error(message, "Ocurrió un error", "Este comando no se puede ejecutar acá debido a que el canal no está categorizado como **NSFW**.");
     if (!args[0]) {
         let random = Math.floor(Math.random() * 2000);
