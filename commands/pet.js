@@ -1,59 +1,216 @@
-const { MessageEmbed } = require("discord.js"); // Importa solo MessageEmbed de la librería de Discord, MessageEmbed son los mensajes que se mandan en los cuadros
-const extras = require("../utils/extras"); // Una librería de apoyo que creé para los mensajes de error, éxito, etc
+const { MessageEmbed } = require("discord.js");
+const extras = require("../utils/extras");
+const pets = require("../utils/pets").pet;
+const path = require("path");
+const ms = require("parse-ms");
 
-// run significa que todo lo que esté adentro de acá va a ejecutarse cuando pongan el comando
-module.exports.run = async (bot, message, args, settings, userdata) /* Estos son parámetros que predefiní para trabajar con ellos */ => {
-    if (!userdata.pets && !args[0] || args[0].toLowerCase() !== "buy") // Si el usuario no tiene registros de pets o no puso ningún argumento (los argumentos son las palabras después del comando, por ejemplo si pongo m!pet buy asd 1, args[0] es buy, args[1] es asd y args[2] es 1 (los arrays empiezan en el índice 0))
-        return extras.new_error(message, "Ocurrió un error", `No tienes un pet todavía. ¡Compra uno con **${settings.prefix}pet buy**!`); // Msg de error
+module.exports.run = async (bot, message, args, settings, userdata) => {
+    if ((userdata.pet.length === 0 && !args[0]) || (userdata.pet.length === 0 && args[0].toLowerCase() !== "buy"))
+        return extras.new_error(message, "Ocurrió un error", `No tienes un pet todavía. ¡Compra uno con **${settings.prefix}pet buy**!`);
+    else if (!args[0]) {
+        let feedInfo = ms(Date.now() - userdata.lastPetFeed);
+        const embed = new MessageEmbed()
+            .attachFiles(path.join(__dirname, "..", "images", "pets", `${pets(userdata.pet, "id")}.png`))
+            .setAuthor(`Menú informativo | ${message.author.tag}`, message.author.displayAvatarURL({ dynamic: true }))
+            .setTitle("Estadísticas de tu mascota:")
+            .setThumbnail(`attachment://${pets(userdata.pet, "id")}.png`)
+            .addField("Nombre:", userdata.petName)
+            .addField("Puntos de experiencia:", `${userdata.petXp}/${calculatePetLevel(userdata.petLevel + 1)} **EXP**`, true)
+            .addField("Nivel:", userdata.petLevel, true)
+            .addField("Última vez alimentado:", userdata.lastPetFeed !== 0 ? `Hace ${feedInfo.days} día(s), ${feedInfo.hours} hora(s), ${feedInfo.minutes} minuto(s)` : "Nunca")
+            .addField("Resistencia sin comer:", `${ms(pets(userdata.pet, "food_resistence")).days} día(s)`, true)
+            .addField("Veces totales alimentado:", userdata.timesFed, true)
+            .addField("Habilidades:", pets(userdata.pet, "habilities").length > 0 ? pets(userdata.pet, "habilities").map(h => `**•** ${h}`).join("\n") : "Ninguna")
+            .setColor(extras.color_general)
 
-    // switch lo que hace es tomar un parámetro y revisar en los casos definidos abajo cuál coincide, si ese coincide, ejecuta lo que está dentro (default es el caso donde ninguno coincide)
+        return message.channel.send(embed);
+    }
+
     switch (args[0].toLowerCase()) {
         case "buy": {
-            // esto va a ser el embed que se va a mandar (o sea, el mensaje en el cuadro)
+            if (userdata.pet.length !== 0) return extras.new_error(message, "Ocurrió un error", `Ya tienes un pet activo (**${pets(userdata.pet, "name")}**).`+
+            ` Si quieres cambiarlo, a costa de perder todo el progreso que llevas actualmente con él y recibir un 10 % de reembolso de su precio original, usa **${settings.prefix}pet change**.`)
+
             const embed = new MessageEmbed()
                 .setAuthor(`Menú de mascotas | ${message.author.tag}`, message.author.displayAvatarURL({ dynamic: true }))
                 .setDescription("Responde al mensaje con los números de abajo según lo que quieras hacer!"+
                 "\n**1 ::** Comprar una nueva mascota")
+                .setColor(extras.color_general)
             
-            // Importante usar await acá para esperar a que se resuelva la "promesa" del bot de enviar el mensaje
-            await message.channel.send(embed).then(async m /* el then es para que cuando envíe el mensaje, ejecute todo lo que está dentro de este bloque (async es importante para las promesas) */ => {
-                await m.react(extras.red_x_id) // para esto era básicamente el async de arriba, se tiene que resolver la promesa de reaccionar primero antes de seguir ejecutando el código
+            await message.channel.send(embed).then(async m => {
+                await m.react(extras.red_x_id).catch(() => { return; });
 
-                let emojiFilter = (reaction, user) => { return reaction.emoji.id === extras.red_x_id && user.id === message.author.id; }; // filtro del colector, solo pasan las reacciones que sean a la "x" (cualquier otro emoji no va a hacer nada) y la id del usuario que reacciona tiene que ser la misma del que envió el mensaje
-                let messageFilter = (msg) => { return ["1"].includes(msg.content) && msg.author.id === message.author.id; }; // filtro de los mensajes que se van a recibir, la id del que lo envía tiene que ser la misma del que envió el mensaje original y el mensaje debe contener "1" por ahora, que es la única opción disponible, cualquier otro msg lo ignora
+                let emojiFilter = (reaction, user) => { return reaction.emoji.id === extras.red_x_id && user.id === message.author.id; }; 
+                let messageFilter = (msg) => { return ["1"].includes(msg.content) && msg.author.id === message.author.id; };
 
-                // crea el colector de emojis
                 const collectorEmoji = m.createReactionCollector(emojiFilter);
-                // crea el colector de mensajes
-                const collectorMsg = m.channel.createMessageCollector(messageFilter, { max: 1, time: 15000 }); // max: 1 significa que va a recibir solo 1 y time: 15000 son 15 segundos en milisegundos, es decir, luego de eso no recibirá nada más.
+                const collectorMsg = m.channel.createMessageCollector(messageFilter, { max: 1, time: 15000, errors: ["time"] });
 
-                // <nombre del colector>.on("collect", (parámetros) => [...] { [código...] }) lo que hace es que cuando capta un emoji, ejecuta todo lo que esté dentro de su bloque
                 collectorEmoji.on("collect", () => { 
-                    collectorEmoji.stop(); collectorMsg.stop(); // como la opción única para los emojis es la x, al reaccionar a ella pararán todos los colectores y se eliminará el mensaje, puesto que si dejo los colectores andando se gastan recursos innecesariamente.
+                    collectorEmoji.stop(); collectorMsg.stop();
                     return m.delete();
                 });
 
-                // Lo mismo de arriba
-                collectorMsg.on("collect", (msg) => { 
+                collectorMsg.on("collect", async (msg) => { 
                     collectorEmoji.stop(); collectorMsg.stop();
                     m.delete();
 
                     if (msg.content === "1") {
-                        return message.channel.send("proximamente");
+                        let claimablePets = ["cat_1", "cat_2"];
+
+                        let currentPage = 0;
+                        const embeds = pageGenerator(claimablePets, message);
+                        await message.channel.send(`🔸 ** |  Página actual: (${currentPage + 1}/${embeds.length})**`, embeds[currentPage]).then(async m => {
+                            await m.react("⬅"); await m.react("➡"); await m.react("🗑");
+
+                            const emojiFilter = (reaction, user) => { return ["⬅", "➡", "🗑"].includes(reaction.emoji.name) && user.id === message.author.id; };
+                            let messageFilter = msg => { return msg.author.id === message.author.id && msg.content.toLowerCase() === "claim" };
+
+                            const emojiCollector = m.createReactionCollector(emojiFilter);
+                            const messageCollector = m.channel.createMessageCollector(messageFilter, { max: 1, time: 150000 });
+                      
+                            emojiCollector.on('collect', async (reaction, user) => {
+                              if (reaction.emoji.name === "➡") {
+                                await m.reactions.cache.find(r => r.emoji.name == "➡").users.remove(message.author.id);
+                                if (currentPage < embeds.length - 1) {
+                                  currentPage++;
+                                  m.edit(`🔸 ** |  Página actual: (${currentPage + 1}/${embeds.length})**`, embeds[currentPage]);
+                                }
+                              } else if (reaction.emoji.name === "⬅") {
+                                await m.reactions.cache.find(r => r.emoji.name == "⬅").users.remove(message.author.id);
+                                if (currentPage !== 0) {
+                                  currentPage--;
+                                  m.edit(`🔸 ** |  Página actual: (${currentPage + 1}/${embeds.length})**`, embeds[currentPage]);
+                                }
+                              } else {
+                                emojiCollector.stop(); messageCollector.stop();
+                                return m.delete();
+                              }
+                            });
+                            
+                            messageCollector.on('collect', async (msg) => {
+                              let option = claimablePets[currentPage];
+
+                              if (userdata.credits < pets(option, "price")) {
+                                  emojiCollector.stop(); messageCollector.stop();
+                                  m.delete();
+                                  return extras.new_error(message, "Ocurrió un error", 
+                                  `¡No tienes suficientes créditos para realizar esta transacción! Revisa tu billetera con **${settings.prefix}credits**.`);
+                              }
+                      
+                              try {
+                                if (pets(option, "id") === "cat_1") {
+                                    bot.updateUserData(message.author, { pet: option, petMultiplier: pets(option, "defaultMultiplier"), petName: pets(option, "name"), $addToSet: { badges: option }, $inc: { credits: -pets(option, "price") }});
+                                } else if (pets(option, "id") === "cat_2") {
+                                    bot.updateUserData(message.author, { pet: option, petMultiplier: pets(option, "defaultMultiplier"), petName: pets(option, "name"), $inc: { credits: -pets(option, "price") }});
+                                }
+                              } catch { return; }
+                              
+                              emojiCollector.stop(); messageCollector.stop();
+                              m.delete();
+                              return extras.new_success(message, "Compra realizada", `¡El pet **${pets(option, "name")}** ahora es de tu propiedad!`);
+                            });
+                      
+                            messageCollector.on("end", (msg) => {
+                              if (!msg) {
+                                emojiCollector.stop(); messageCollector.stop();
+                                return m.delete();
+                              }
+                            });
+                        });
                     }
                 });
 
-                // Lo mismo de arriba, solo que este lo que hará es que cuando termine el colector (end), ejecutará el código dentro del bloque. ¿Cuándo termina el colector? En 15 segundos desde que se envía el mensaje, ya que lo especifiqué al crear el colector (time: 15000)
                 collectorMsg.on("end", (msg) => {
                     if (!msg) {
                         collectorEmoji.stop(); collectorMsg.stop();
                         return m.delete();
                     }
                 });
-            }).catch((err) => { return console.log(err); }); // debug: si capta algún error, va a devolverlo a la consola (yo aquí por lo general pongo return; ya que solo cuando te reporten algún bug es necesario logearlo a la consola).
+            }).catch(() => { return; });
             break;
         }
+        case "feed": {
+            const feedSchedule = [1.44e+7, 1.26e+7, 1.08e+7, 9e+6, 7.2e+6];
+            let randomHour = feedSchedule[Math.floor(Math.random() * feedSchedule.length)];
+            if (randomHour - (Date.now() - userdata.lastPetFeed) > 0)
+                return extras.new_error(message, "Ocurrió un error", `¡Tu mascota está satisfecha! Inténtalo de nuevo más tarde.`);
+
+            let xpToAdd = Math.floor(15 * Math.random() + 90);
+            try {
+                if (calculatePetLevel(userdata.petLevel + 1) <= userdata.petXp) {
+                    bot.updateUserData(message.author, { lastPetFeed: Date.now(), $inc: { timesFed: 1, petXp: xpToAdd, petLevel: 1 }});
+                    return extras.new_success(message, "Mascota alimentada", `**+${xpToAdd} EXP**.\n¡Tu mascota ha subido de nivel! (Ahora es nivel **${petLevel + 1}**).`);
+                }
+                bot.updateUserData(message.author, { lastPetFeed: Date.now(), $inc: { timesFed: 1, petXp: xpToAdd }});
+                return extras.new_success(message, "Mascota alimentada", `**+${xpToAdd} EXP**.`);
+            } catch { return; }
+        }
+        
+        case "change": {
+            const embed = new MessageEmbed()
+                .setAuthor(`Confirma esta acción | ${message.author.tag}`, message.author.displayAvatarURL({ dynamic: true }))
+                .setDescription(`¿Estás seguro de que quieres cambiar a tu pet, **${userdata.petName}**? Se te reembolsará el 10% de lo que te costó,`+
+                ` es decir, 💵 $${pets(userdata.pet, "price") / 10}. Reacciona con ${extras.green_tick} si quieres continuar, o ${extras.red_x} si te arrepientes.`+
+                "\n\n⚠ **¡Perderás todo el progreso actual!**")
+                .setColor(extras.color_general)
+                
+            let filter = (reaction, user) => { return [extras.green_tick_id, extras.red_x_id].includes(reaction.emoji.id) && user.id === message.author.id; };
+            await message.channel.send(embed).then(async m => { await m.react(extras.green_tick_id); await m.react(extras.red_x_id);
+                m.awaitReactions(filter, { max: 1, time: 30000 })
+                .then(collected => {
+                    let reaction = collected.first();
+                    if (reaction.emoji.id === extras.green_tick_id) {
+                        try {
+                            if (pets(userdata.pet, "id") === "cat_1") {
+                                bot.updateUserData(message.author, { lastPetFeed: 0, petXp: 0, timesFed: 0, $pull: { badges: pets(userdata.pet, "id") }, $inc: { credits: pets(userdata.pet, "price") / 10 }, pet: "", petMultiplier: 1, petName: "" });
+                            }
+                        } catch { return extras.new_error(message, "Ocurrió un error", "No se pudo completar esta operación"); }
+                    }
+                    else return m.delete();
+
+                    m.delete();
+                    return extras.new_success(message, "Acción completada", `¡Ya no posees mascotas! Si quieres comprar una nueva, usa **${settings.prefix}pet buy**.`);
+                }).catch(() => { return m.delete(); })
+            });
+            break;
+        }
+
+        case "setname": {
+            let newName = args.slice(1).join(" ");
+            if (!newName || args.length > 11) return extras.new_error(message, "Ocurrió un error", 
+            "Debes especificar un nombre válido para tu mascota. Este debe contener entre 1 y 10 palabras.");
+            
+            try {
+                bot.updateUserData(message.author, { petName: newName });
+            } catch { return; }
+
+            return extras.new_success(message, "Acción completada", `¡El nombre de tu pet ha sido cambiado correctamente a **${newName}**!`);
+        }
     }
+}
+
+function pageGenerator(values, message) {
+    const pages = [];
+    for (i = 0; i < values.length; i++) {
+      const embed = new MessageEmbed()
+        .attachFiles(path.join(__dirname, "..", "images", "pets", `${pets(values[i], "id")}.png`))
+        .setAuthor(`Menú de mascotas | ${message.author.tag}`, message.author.displayAvatarURL({ dynamic: true }))
+        .setTitle(`${pets(values[i], "name")}:`)
+        .setThumbnail(`attachment://${pets(values[i], "id")}.png`)
+        .addField("Precio:", `💵 $${pets(values[i], "price")}`, true)
+        .addField("Autor:", pets(values[i], "author"), true)
+        .addField("Resistencia sin comer:", `${ms(pets(values[i], "food_resistence")).days} día(s)`)
+        .addField("Habilidades:", pets(values[i], "habilities").length > 0 ? pets(values[i], "habilities").map(h => `**•** ${h}`).join("\n") : "Ninguna")
+        .setColor(extras.color_general)
+        .setFooter("Escribe claim en el chat para comprarla.")
+      pages.push(embed);
+    }
+    return pages;
+}
+
+function calculatePetLevel(level) {
+    return 401 * level ** 2;
 }
 
 module.exports.help = {
