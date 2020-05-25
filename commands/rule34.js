@@ -30,7 +30,7 @@ module.exports.run = async (bot, message, args, settings) => {
                 }
 
                 try {
-                    request(apiLink, (err, response, body) => {
+                    request(apiLink, async (err, response, body) => {
                         try { body = JSON.parse(body); } catch { return; }
                         if (body.length === 0) return extras.new_error(message, "Ocurrió un error", "No se pudo encontrar esa etiqueta (o página)."+
                         " En el caso de que hayas especificado una página, quita el parámetro -p del comando, porque puede que de esa búsqueda hayan menos de 100 resultados.");
@@ -74,3 +74,4 @@ module.exports.help = {
     nombre: "rule34",
     aliases: ["r34"]
 }
+
