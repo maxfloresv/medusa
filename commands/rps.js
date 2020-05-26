@@ -1,5 +1,6 @@
 const { MessageEmbed } = require("discord.js");
 const extras = require("../utils/extras");
+const activeGames = new Set();
 const chooseArr = ["🗻", "📰", "✂"];
 let types = {
     "🗻": "🗻 Piedra",
@@ -44,17 +45,27 @@ module.exports.run = async (bot, message, args, settings) => {
     } else {
         if (user.bot) return extras.new_error(message, "Ocurrió un error", `No me gusta que juegues con otros bots. Prueba mejor con **${settings.prefix}rps** para desafiarme.`);
         if (user.id === message.author.id) return extras.new_error(message, "Ocurrió un error", `Si no tienes a nadie con quien jugar, siempre puedes jugar conmigo... usa **${settings.prefix}rps**.`);
+        if (activeGames.has(message.author.id)) return extras.new_error(message, "Ocurrió un error", "Ya estás en búsqueda de un juego."+
+        "\n**Tip:** Si quieres cancelar la búsqueda, escribe `cancel` en el chat.");
 
-        const m = await message.channel.send(`Estado: Esperando respuesta de ${user}\n**${user.username}**, escribe \`accept\` en el chat para aceptar el duelo, o \`reject\` para rechazarlo`);
+        activeGames.add(message.author.id);
 
-        const filter = (msg) => { return ["accept", "reject"].includes(msg.content.toLowerCase()) && msg.author.id === user.id; };
-        const collector = m.channel.createMessageCollector(filter, { time: 40000 });
+        const m = await message.channel.send(`Estado: Esperando respuesta de ${user} (30 segundos para responder):\n`+
+        `**${user.username}**, escribe \`accept\` en el chat para aceptar el duelo, o \`reject\` para rechazarlo`);
+
+        const filter = (msg) => { return ["accept", "reject"].includes(msg.content.toLowerCase()) && msg.author.id === user.id
+            || msg.content.toLowerCase() === "cancel" && msg.author.id === message.author.id; 
+        };
+        const collector = m.channel.createMessageCollector(filter, { time: 30000 });
 
         collector.on("collect", async (msg) => {
-            collector.stop();
-            if (msg.content.toLowerCase() === "reject") 
+            if (msg.content.toLowerCase() === "reject") {
+                collector.stop();
                 return extras.new_error(message, "Juego cancelado.", `${user} no quiere jugar en este momento.`);
-            else {
+            } else if (msg.content.toLowerCase() === "cancel") {
+                collector.stop();
+                return extras.new_success(message, "Juego cancelado", `**${message.author.username}**, ya puedes intentar desafiar a otra persona.`);
+            } else {
                 const embedAuthor = new MessageEmbed()
                     .setAuthor(`Piedra, papel o tijera | ${message.author.tag}`, message.author.displayAvatarURL({ dynamic: true }))
                     .setDescription(`Duelo contra **${user.username}**: ¡Reacciona con uno de los emojis para elegir una opción!`)
@@ -69,6 +80,8 @@ module.exports.run = async (bot, message, args, settings) => {
                     const authorRps = await message.author.send(embedAuthor);
                     const userRps = await user.send(embedUser);
 
+                    message.channel.send(`${extras.loading} Esperando respuestas... revisen sus mensajes directos.`).then(m => m.delete({ timeout: 8000 }));
+
                     await authorRps.react("🗻"); await userRps.react("🗻");
                     await authorRps.react("📰"); await userRps.react("📰");
                     await authorRps.react("✂"); await userRps.react("✂");
@@ -81,8 +94,7 @@ module.exports.run = async (bot, message, args, settings) => {
                     let resultsEmbed = new MessageEmbed().setColor(extras.color_general);
 
                     let authorOption, userOption;
-                    collectorAuthor.on("collect", (reaction) => {
-                        authorRps.delete();
+                    collectorAuthor.on("collect", async (reaction) => {
                         authorOption = reaction.emoji.name;
                         if (userOption !== undefined) {
                             if ((authorOption === "🗻" && userOption === "✂") ||
@@ -93,13 +105,13 @@ module.exports.run = async (bot, message, args, settings) => {
                                 resultsEmbed.addField(`Resultados:`, `• Elección de **${message.author.username}:** ${types[authorOption]}`+
                                 `\n• Elección de **${user.username}:** ${types[userOption]}`)
                                 resultsEmbed.setThumbnail(message.author.displayAvatarURL({ dynamic: true }))
-                                return message.channel.send(resultsEmbed);
+                                message.channel.send(resultsEmbed);
                             } 
                             else if (authorOption === userOption) {
                                 resultsEmbed.setAuthor("Piedra, papel o tijera | Juego terminado", bot.user.displayAvatarURL())
                                 resultsEmbed.setTitle(`¡Empate! ${message.author.username} vs. ${user.username}`)
                                 resultsEmbed.setDescription(`Esta vez no hubo suerte para ninguno de los dos. Ambos eligieron ${types[authorOption]}`)
-                                return message.channel.send(resultsEmbed);
+                                message.channel.send(resultsEmbed);
                             }
                             else {
                                 resultsEmbed.setAuthor("Piedra, papel o tijera | Juego terminado", bot.user.displayAvatarURL())
@@ -107,13 +119,13 @@ module.exports.run = async (bot, message, args, settings) => {
                                 resultsEmbed.addField(`Resultados:`, `• Elección de **${message.author.username}:** ${types[authorOption]}`+
                                 `\n• Elección de **${user.username}:** ${types[userOption]}`)
                                 resultsEmbed.setThumbnail(user.displayAvatarURL({ dynamic: true }))
-                                return message.channel.send(resultsEmbed);
+                                message.channel.send(resultsEmbed);
                             }
                         }
+                        collectorAuthor.stop();
                     });
 
-                    collectorUser.on("collect", (reaction) => {
-                        collectorUser.stop();
+                    collectorUser.on("collect", async (reaction) => {
                         userOption = reaction.emoji.name;
                         if (authorOption !== undefined) {
                             if ((authorOption === "🗻" && userOption === "✂") ||
@@ -124,13 +136,13 @@ module.exports.run = async (bot, message, args, settings) => {
                                 resultsEmbed.addField(`Resultados:`, `• Elección de **${message.author.username}:** ${types[authorOption]}`+
                                 `\n• Elección de **${user.username}:** ${types[userOption]}`)
                                 resultsEmbed.setThumbnail(message.author.displayAvatarURL({ dynamic: true }))
-                                return message.channel.send(resultsEmbed);
+                                message.channel.send(resultsEmbed);
                             } 
                             else if (authorOption === userOption) {
                                 resultsEmbed.setAuthor("Piedra, papel o tijera | Juego terminado", bot.user.displayAvatarURL())
                                 resultsEmbed.setTitle(`¡Empate! ${message.author.username} vs. ${user.username}`)
                                 resultsEmbed.setDescription(`Esta vez no hubo suerte para ninguno de los dos. Ambos eligieron ${types[authorOption]}`)
-                                return message.channel.send(resultsEmbed);
+                                message.channel.send(resultsEmbed);
                             }
                             else {
                                 resultsEmbed.setAuthor("Piedra, papel o tijera | Juego terminado", bot.user.displayAvatarURL())
@@ -138,33 +150,17 @@ module.exports.run = async (bot, message, args, settings) => {
                                 resultsEmbed.addField(`Resultados:`, `• Elección de **${message.author.username}:** ${types[authorOption]}`+
                                 `\n• Elección de **${user.username}:** ${types[userOption]}`)
                                 resultsEmbed.setThumbnail(user.displayAvatarURL({ dynamic: true }))
-                                return message.channel.send(resultsEmbed);
+                                message.channel.send(resultsEmbed);
                             }
                         }
+                        collectorUser.stop();
                     });
 
-                    collectorUser.on("end", () => { userRps.delete(); });
+                    collectorUser.on("end", (reaction) => {
+                        if (reaction.size === 0) {
+                            userRps.delete();
+                            if (authorOption === undefined) return;
 
-                    collectorAuthor.on("end", () => { 
-                        if (userOption === undefined && authorOption === undefined) {
-                            const noResponse = new MessageEmbed()
-                                .setTitle("Nadie respondió...")
-                                .setDescription(`${extras.red_x} El juego entre ${message.author.username} y ${user.username} finalizó en un empate.`)
-                                .setColor(extras.color_error)
-
-                            authorRps.delete();
-                            return message.channel.send(noResponse);
-                        }
-                        else if (authorOption === undefined) {
-                            resultsEmbed.setAuthor("Piedra, papel o tijera | Juego terminado", bot.user.displayAvatarURL())
-                            resultsEmbed.setTitle(`Ganador: ${user.username}`)
-                            resultsEmbed.addField(`Resultados:`, `• Elección de **${message.author.username}:** Ninguna`+
-                            `\n• Elección de **${user.username}:** ${types[userOption]}`)
-                            resultsEmbed.setThumbnail(user.displayAvatarURL({ dynamic: true }))
-                            authorRps.delete();
-                            return message.channel.send(resultsEmbed);
-                        }
-                        else if (userOption === undefined) {
                             resultsEmbed.setAuthor("Piedra, papel o tijera | Juego terminado", bot.user.displayAvatarURL())
                             resultsEmbed.setTitle(`Ganador: ${message.author.username}`)
                             resultsEmbed.addField(`Resultados:`, `• Elección de **${message.author.username}:** ${types[authorOption]}`+
@@ -172,13 +168,37 @@ module.exports.run = async (bot, message, args, settings) => {
                             resultsEmbed.setThumbnail(message.author.displayAvatarURL({ dynamic: true }))
                             return message.channel.send(resultsEmbed);
                         }
-                        else return;
+                        else return userRps.delete();
                     });
-                    message.channel.send("Esperando respuestas...");
+
+                    collectorAuthor.on("end", (reaction) => {
+                        if (reaction.size === 0) {
+                            authorRps.delete();
+                            if (userOption === undefined) {
+                                const noResponse = new MessageEmbed()
+                                    .setTitle("Nadie respondió...")
+                                    .setDescription(`${extras.red_x} El juego entre ${message.author.username} y ${user.username} finalizó en un empate.`)
+                                    .setColor(extras.color_error)
+    
+                                return message.channel.send(noResponse);
+                            }
+                            
+                            resultsEmbed.setAuthor("Piedra, papel o tijera | Juego terminado", bot.user.displayAvatarURL())
+                            resultsEmbed.setTitle(`Ganador: ${user.username}`)
+                            resultsEmbed.addField(`Resultados:`, `• Elección de **${message.author.username}:** Ninguna`+
+                            `\n• Elección de **${user.username}:** ${types[userOption]}`)
+                            resultsEmbed.setThumbnail(user.displayAvatarURL({ dynamic: true }))
+                            return message.channel.send(resultsEmbed);
+                        }
+                        else return authorRps.delete();
+                    });
                 } catch { return extras.new_error(message, "Ocurrió un error", "Uno de los dos participantes tenía los mensajes directos desactivados. Juego cancelado."); }
             }
         });
-        collector.on("end", () => { return m.delete(); })
+        collector.on("end", () => {
+            activeGames.delete(message.author.id);
+            return m.delete(); 
+        });
     }
 }
 
