@@ -1,6 +1,5 @@
 const { MessageEmbed } = require("discord.js");
 const extras = require("../utils/extras");
-const schedule = require("node-schedule");
 const chooseArr = ["🗻", "📰", "✂"];
 let types = {
     "🗻": "🗻 Piedra",
@@ -26,7 +25,7 @@ module.exports.run = async (bot, message, args, settings) => {
         await rpsEmbed.react("✂");
 
         const filter = (reaction, user) => { return ["🗻", "📰", "✂"].includes(reaction.emoji.name) && user.id === message.author.id; };
-        const collector = rpsEmbed.createReactionCollector(filter, { max: 1, time: 30000 });
+        const collector = rpsEmbed.createReactionCollector(filter, { max: 1, time: 20000 });
 
         collector.on("collect", (reaction, user) => {
             collector.stop();
@@ -44,11 +43,12 @@ module.exports.run = async (bot, message, args, settings) => {
         collector.on("end", () => { return rpsEmbed.delete(); });
     } else {
         if (user.bot) return extras.new_error(message, "Ocurrió un error", `No me gusta que juegues con otros bots. Prueba mejor con **${settings.prefix}rps** para desafiarme.`);
+        if (user.id === message.author.id) return extras.new_error(message, "Ocurrió un error", `Si no tienes a nadie con quien jugar, siempre puedes jugar conmigo... usa **${settings.prefix}rps**.`);
 
         const m = await message.channel.send(`Estado: Esperando respuesta de ${user}\n**${user.username}**, escribe \`accept\` en el chat para aceptar el duelo, o \`reject\` para rechazarlo`);
 
         const filter = (msg) => { return ["accept", "reject"].includes(msg.content.toLowerCase()) && msg.author.id === user.id; };
-        const collector = m.channel.createMessageCollector(filter, { time: 60000 });
+        const collector = m.channel.createMessageCollector(filter, { time: 40000 });
 
         collector.on("collect", async (msg) => {
             collector.stop();
@@ -75,8 +75,8 @@ module.exports.run = async (bot, message, args, settings) => {
 
                     const filterAuthor = (reaction, rpsUser) => { return ["🗻", "📰", "✂"].includes(reaction.emoji.name) && rpsUser.id === message.author.id; };
                     const filterUser = (reaction, rpsUser) => { return ["🗻", "📰", "✂"].includes(reaction.emoji.name) && rpsUser.id === user.id; }
-                    const collectorAuthor = authorRps.createReactionCollector(filterAuthor, { max: 1, time: 15000 });
-                    const collectorUser = userRps.createReactionCollector(filterUser, { max: 1, time: 15000 });
+                    const collectorAuthor = authorRps.createReactionCollector(filterAuthor, { max: 1, time: 20000 });
+                    const collectorUser = userRps.createReactionCollector(filterUser, { max: 1, time: 20000 });
 
                     let resultsEmbed = new MessageEmbed().setColor(extras.color_general);
 
